@@ -1,12 +1,14 @@
-import React, { useSyncExternalStore } from "react";
+import React, { Profiler, useSyncExternalStore } from "react";
 import type { SectionId, Validity } from "./shared/types";
 import { makeSectionIds } from "./shared/types";
 import {
   logAction,
+  logProfilerDuration,
   subscribe as logSubscribe,
   getSnapshot as logSnapshot,
   clearLog,
 } from "./shared/logStore";
+import type { PatternKey } from "./shared/logStore";
 import {
   ValidityProvider,
   useValidityContext,
@@ -23,7 +25,9 @@ import {
   usePureContext,
 } from "./patterns/pureContext/PureContext";
 import { PureContextColumn } from "./patterns/pureContext/PureContextDemo";
+import { ContextMemoColumn } from "./patterns/contextMemo/ContextMemoDemo";
 import { ZustandColumn } from "./patterns/zustand/ZustandDemo";
+import { WhyPanel } from "./shared/WhyPanel";
 import "./App.css";
 
 function SharedControls({ sectionIds }: { sectionIds: SectionId[] }) {
@@ -49,6 +53,18 @@ function SharedControls({ sectionIds }: { sectionIds: SectionId[] }) {
     zustandSetAll(validity);
   };
 
+  const handleRapidFire = () => {
+    let i = 0;
+    const fire = () => {
+      if (i >= 10) return;
+      const randomId = sectionIds[Math.floor(Math.random() * sectionIds.length)];
+      handleToggle(randomId);
+      i++;
+      setTimeout(fire, 50);
+    };
+    fire();
+  };
+
   return (
     <div className="controls">
       <div className="bulk-controls">
@@ -60,6 +76,9 @@ function SharedControls({ sectionIds }: { sectionIds: SectionId[] }) {
           onClick={() => handleSetAll("invalid")}
         >
           All INVALID
+        </button>
+        <button className="btn btn-stress" onClick={handleRapidFire}>
+          Rapid fire (10x)
         </button>
       </div>
       <div className="toggle-grid">
@@ -77,11 +96,11 @@ function SharedControls({ sectionIds }: { sectionIds: SectionId[] }) {
   );
 }
 
-function LogCount({ label, count }: { label: string; count: number }) {
+function LogCount({ label, count, ms }: { label: string; count: number; ms: number | null }) {
   const cls = count > 1 ? "log-count high" : "log-count low";
   return (
     <span className={cls}>
-      {label}: {count}
+      {label}: {count}{ms !== null && <span className="log-ms"> {ms === 0 ? "<0.1" : ms.toFixed(3)}ms</span>}
     </span>
   );
 }
@@ -109,16 +128,23 @@ function LogPanel() {
             <div key={entry.id} className="log-entry">
               <span className="log-time">{entry.time}</span>
               <span className="log-action">{entry.action}</span>
-              <LogCount label="Ctx+Reducer" count={entry.counts.context} />
-              <LogCount label="Ctx+State" count={entry.counts.pureContext} />
-              <LogCount label="ExtStore" count={entry.counts.external} />
-              <LogCount label="Zustand" count={entry.counts.zustand} />
+              <LogCount label="Ctx+Reducer" count={entry.counts.context} ms={entry.durationMs.context} />
+              <LogCount label="Ctx+State" count={entry.counts.pureContext} ms={entry.durationMs.pureContext} />
+              <LogCount label="Ctx+Memo" count={entry.counts.contextMemo} ms={entry.durationMs.contextMemo} />
+              <LogCount label="ExtStore" count={entry.counts.external} ms={entry.durationMs.external} />
+              <LogCount label="Zustand" count={entry.counts.zustand} ms={entry.durationMs.zustand} />
             </div>
           ))}
         </div>
       )}
     </div>
   );
+}
+
+function onProfilerRender(pattern: PatternKey) {
+  return (_id: string, _phase: string, actualDuration: number) => {
+    logProfilerDuration(pattern, actualDuration);
+  };
 }
 
 export default function App() {
@@ -146,38 +172,75 @@ export default function App() {
 
           <SharedControls sectionIds={sectionIds} />
 
+          <LogPanel />
+
           <div className="columns">
             <div className="column">
               <h3>Context + Reducer</h3>
               <p className="column-hint">
                 Re-renders ALL cells on any change
               </p>
-              <ContextColumn sectionIds={sectionIds} />
+              <WhyPanel>
+                useContext() re-renders every consumer when the provider value changes.
+                The entire state object is the value, so any change invalidates all consumers.
+              </WhyPanel>
+              <Profiler id="context" onRender={onProfilerRender("context")}>
+                <ContextColumn sectionIds={sectionIds} />
+              </Profiler>
             </div>
             <div className="column">
               <h3>Context + useState</h3>
               <p className="column-hint">
                 Re-renders ALL cells on any change
               </p>
-              <PureContextColumn sectionIds={sectionIds} />
+              <WhyPanel>
+                Same mechanism as Reducer. Whether you use useState or useReducer doesn't matter
+                — the context value is a new object on every change.
+              </WhyPanel>
+              <Profiler id="pureContext" onRender={onProfilerRender("pureContext")}>
+                <PureContextColumn sectionIds={sectionIds} />
+              </Profiler>
+            </div>
+            <div className="column">
+              <h3>Context + memo()</h3>
+              <p className="column-hint">
+                memo() can't prevent context re-renders
+              </p>
+              <WhyPanel>
+                React.memo() compares props, but context changes bypass memo entirely.
+                If a component reads from useContext(), it re-renders whenever that context changes.
+              </WhyPanel>
+              <Profiler id="contextMemo" onRender={onProfilerRender("contextMemo")}>
+                <ContextMemoColumn sectionIds={sectionIds} />
+              </Profiler>
             </div>
             <div className="column">
               <h3>useSyncExternalStore</h3>
               <p className="column-hint">
                 Only re-renders the affected cell
               </p>
-              <ExternalStoreColumn sectionIds={sectionIds} />
+              <WhyPanel>
+                Each cell subscribes with a selector that returns only its value.
+                React compares the result with Object.is() — if it didn't change, no re-render.
+              </WhyPanel>
+              <Profiler id="external" onRender={onProfilerRender("external")}>
+                <ExternalStoreColumn sectionIds={sectionIds} />
+              </Profiler>
             </div>
             <div className="column">
               <h3>Zustand</h3>
               <p className="column-hint">
                 Only re-renders the affected cell
               </p>
-              <ZustandColumn sectionIds={sectionIds} />
+              <WhyPanel>
+                Uses useSyncExternalStore internally with per-selector subscriptions.
+                Same mechanism as external store but with a cleaner API.
+              </WhyPanel>
+              <Profiler id="zustand" onRender={onProfilerRender("zustand")}>
+                <ZustandColumn sectionIds={sectionIds} />
+              </Profiler>
             </div>
           </div>
-
-          <LogPanel />
         </div>
       </ExternalStoreProvider>
       </PureContextProvider>

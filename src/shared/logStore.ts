@@ -1,10 +1,11 @@
-export type PatternKey = "context" | "pureContext" | "external" | "zustand";
+export type PatternKey = "context" | "pureContext" | "contextMemo" | "external" | "zustand";
 
 export type LogEntry = {
   id: number;
   time: string;
   action: string;
   counts: Record<PatternKey, number>;
+  durationMs: Record<PatternKey, number | null>;
 };
 
 let entries: LogEntry[] = [];
@@ -41,12 +42,13 @@ export function logAction(action: string) {
     id: nextId++,
     time: new Date().toLocaleTimeString("en-GB", { hour12: false }),
     action,
-    counts: { context: 0, pureContext: 0, external: 0, zustand: 0 },
+    counts: { context: 0, pureContext: 0, contextMemo: 0, external: 0, zustand: 0 },
+    durationMs: { context: null, pureContext: null, contextMemo: null, external: null, zustand: null },
   };
   closeTimer = setTimeout(closeEntry, 120);
 }
 
-/** Call from each cell's useEffect. */
+/** Call from each cell's useEffect to count re-renders. */
 export function logRender(pattern: PatternKey, cellId: string) {
   if (!currentEntry) return;
   const key = `${pattern}:${cellId}`;
@@ -55,6 +57,12 @@ export function logRender(pattern: PatternKey, cellId: string) {
   currentEntry.counts[pattern]++;
   if (closeTimer !== null) clearTimeout(closeTimer);
   closeTimer = setTimeout(closeEntry, 60);
+}
+
+/** Call from <Profiler onRender> to record actual render duration. */
+export function logProfilerDuration(pattern: PatternKey, ms: number) {
+  if (!currentEntry) return;
+  currentEntry.durationMs[pattern] = ms;
 }
 
 export function subscribe(listener: () => void) {

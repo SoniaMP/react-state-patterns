@@ -1,6 +1,6 @@
 # Validity Patterns
 
-A React + TypeScript demo that compares three state management approaches for handling validity state (valid/invalid) across many sections. The app renders three columns side by side — **Context + Reducer**, **useSyncExternalStore**, and **Zustand** — and logs re-renders so you can observe the performance differences between each pattern.
+A React + TypeScript demo that compares three state management approaches for handling validity state (valid/invalid) across many sections. The app renders three columns side by side — **Context + useState**, **Context + Reducer**, **useSyncExternalStore**, and **Zustand** — and logs re-renders so you can observe the performance differences between each pattern.
 
 ## What it shows
 
@@ -25,12 +25,12 @@ Then open the URL shown in the terminal (usually `http://localhost:5173`).
 
 ## Scripts
 
-| Command           | Description                    |
-| ----------------- | ------------------------------ |
-| `npm run dev`     | Start the Vite dev server      |
+| Command           | Description                         |
+| ----------------- | ----------------------------------- |
+| `npm run dev`     | Start the Vite dev server           |
 | `npm run build`   | Type-check and build for production |
-| `npm run preview` | Preview the production build   |
-| `npm run lint`    | Run ESLint                     |
+| `npm run preview` | Preview the production build        |
+| `npm run lint`    | Run ESLint                          |
 
 ## Tech stack
 
