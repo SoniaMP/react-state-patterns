@@ -1,4 +1,4 @@
-export type PatternKey = "context" | "external" | "zustand";
+export type PatternKey = "context" | "pureContext" | "external" | "zustand";
 
 export type LogEntry = {
   id: number;
@@ -41,7 +41,7 @@ export function logAction(action: string) {
     id: nextId++,
     time: new Date().toLocaleTimeString("en-GB", { hour12: false }),
     action,
-    counts: { context: 0, external: 0, zustand: 0 },
+    counts: { context: 0, pureContext: 0, external: 0, zustand: 0 },
   };
   closeTimer = setTimeout(closeEntry, 120);
 }

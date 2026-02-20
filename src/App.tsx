@@ -18,11 +18,17 @@ import {
 } from "./patterns/externalStore/ExternalStoreDemo";
 import { useValidityStore } from "./patterns/zustand/useValidityStore";
 import { ContextColumn } from "./patterns/context/ContextDemo";
+import {
+  PureContextProvider,
+  usePureContext,
+} from "./patterns/pureContext/PureContext";
+import { PureContextColumn } from "./patterns/pureContext/PureContextDemo";
 import { ZustandColumn } from "./patterns/zustand/ZustandDemo";
 import "./App.css";
 
 function SharedControls({ sectionIds }: { sectionIds: SectionId[] }) {
   const { dispatch } = useValidityContext();
+  const pureCtx = usePureContext();
   const extStore = useExternalStore();
   const zustandToggle = useValidityStore((s) => s.toggleOne);
   const zustandSetAll = useValidityStore((s) => s.setAll);
@@ -30,6 +36,7 @@ function SharedControls({ sectionIds }: { sectionIds: SectionId[] }) {
   const handleToggle = (id: SectionId) => {
     logAction(`Toggle ${id}`);
     dispatch({ type: "toggleOne", id });
+    pureCtx.toggleOne(id);
     extStore.toggleOne(id);
     zustandToggle(id);
   };
@@ -37,6 +44,7 @@ function SharedControls({ sectionIds }: { sectionIds: SectionId[] }) {
   const handleSetAll = (validity: Validity) => {
     logAction(`Set all ${validity}`);
     dispatch({ type: "setAll", validity });
+    pureCtx.setAll(validity);
     extStore.setAll(validity);
     zustandSetAll(validity);
   };
@@ -101,7 +109,8 @@ function LogPanel() {
             <div key={entry.id} className="log-entry">
               <span className="log-time">{entry.time}</span>
               <span className="log-action">{entry.action}</span>
-              <LogCount label="Context" count={entry.counts.context} />
+              <LogCount label="Ctx+Reducer" count={entry.counts.context} />
+              <LogCount label="Ctx+State" count={entry.counts.pureContext} />
               <LogCount label="ExtStore" count={entry.counts.external} />
               <LogCount label="Zustand" count={entry.counts.zustand} />
             </div>
@@ -118,6 +127,7 @@ export default function App() {
 
   return (
     <ValidityProvider sectionIds={sectionIds}>
+      <PureContextProvider sectionIds={sectionIds}>
       <ExternalStoreProvider sectionIds={sectionIds}>
         <div className="app">
           <div className="header">
@@ -145,6 +155,13 @@ export default function App() {
               <ContextColumn sectionIds={sectionIds} />
             </div>
             <div className="column">
+              <h3>Context + useState</h3>
+              <p className="column-hint">
+                Re-renders ALL cells on any change
+              </p>
+              <PureContextColumn sectionIds={sectionIds} />
+            </div>
+            <div className="column">
               <h3>useSyncExternalStore</h3>
               <p className="column-hint">
                 Only re-renders the affected cell
@@ -163,6 +180,7 @@ export default function App() {
           <LogPanel />
         </div>
       </ExternalStoreProvider>
+      </PureContextProvider>
     </ValidityProvider>
   );
 }
